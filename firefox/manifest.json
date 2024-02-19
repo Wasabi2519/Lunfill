@@ -1,0 +1,24 @@
+{
+    "manifest_version": 2,
+    "name": "Lunfill",
+    "version": "1.0",
+    "description": "昼食のときを便利に",
+    "browser_action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "lunch.png",
+            "48": "lunch.png",
+            "128": "lunch.png"
+        }
+    },
+    "icons": {
+        "16": "lunch.png",
+        "48": "lunch.png",
+        "128": "lunch.png"
+    },
+    "permissions": [
+        "activeTab",
+        "storage"
+    ],
+    "manifest_version": 2
+}
