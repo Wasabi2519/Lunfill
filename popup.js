@@ -1,93 +1,124 @@
-// プリセットを格納する変数
-var presets = [];
 
-// プリセットをセレクトボックスに初回追加
-addPresetsToSelect();
+var presets = [
+    { label: "ファミリーマート", entry: "ファミリーマート" },
+    { label: "セブンイレブン", entry: "セブンイレブン" }
+];
 
-// プリセット追加ボタンがクリックされたときの処理
+var lastOpenedDate = localStorage.getItem('lastOpenedDate');
+var today = new Date().toLocaleDateString();
+
+if (lastOpenedDate !== today) {
+    localStorage.setItem('lastOpenedDate', today);
+}
+
+add();
+
 document.getElementById("addPresetButton").addEventListener("click", function () {
-    var newPresetLabel = prompt("保存したい行き先を入力してください:");
-    if (newPresetLabel) {
-        // ラベル名をURLの一部として利用
-        var newPresetURL = `https://docs.google.com/forms/d/e/1FAIpQLSeU0te7mtB5xNZOEJTuUZ0ugfVx5yMWN6bptes_LLa42oHFQA/viewform?entry.1448980291=%E7%A2%BA%E8%AA%8D%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F&entry.1250370088=${encodeURIComponent(newPresetLabel)}&entry.1695676629=%E7%A2%BA%E8%AA%8D%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F`;
+    var newPresetInput = document.getElementById("newPresetInput");
+    var newPresetLabel = newPresetInput.value.trim();
 
-        // 新しいプリセットをストレージに保存
-        presets.push({ label: newPresetLabel, url: newPresetURL });
-        savePresetsToStorage();
+    if (newPresetLabel) {
+        presets.push({ label: newPresetLabel, entry: newPresetLabel });
+        save();
+        newPresetInput.value = "";
     }
 });
 
-// プリセットを削除する関数
-function removePreset() {
-    var select = document.getElementById("pref");
-    var selectedPref = select.options[select.selectedIndex].value;
-
-    // 選択されたプリセットを配列から削除
-    presets = presets.filter(function (preset) {
-        return preset.label !== selectedPref;
-    });
-
-    // ストレージに新しいプリセット情報を保存
-    savePresetsToStorage();
-
-    // セレクトボックスから選択されたプリセットを削除
-    addPresetsToSelect();
-}
-
-// プリセット削除ボタンがクリックされたときの処理
 document.getElementById("removePresetButton").addEventListener("click", function () {
-    removePreset();
+    showConfirmationModal("全てのプリセットを削除しますか？", "この操作は取り消せません。", function (result) {
+        presets = [];
+        save();
+    }, "削除する", "キャンセル");
 });
 
-// プリセットをセレクトボックスに追加する関数
-function addPresetsToSelect() {
-    var select = document.getElementById("pref");
+function openForm(entry) {
+    showConfirmationModal("確認", "本日はすでにフォームを開いています。", function (result) {
+        if (result) {
+            localStorage.setItem('lastOpenedDate', today);
+            enableSubmitButton();
+            const url = createPresetURL(entry);
+            chrome.tabs.create({ url: url }, function (tab) {});
+        }
+    }, "送る", "やめとく");
+}
 
-    // すでにセレクトボックスに追加されているオプションをクリア
-    select.innerHTML = '<option value="" selected>プリセットを選択してください</option>';
+function enableSubmitButton() {
+    var submitButton = document.getElementById("submitFormButton"); // Replace with the actual ID of your submit button
+    if (submitButton) {
+        submitButton.disabled = false;
+    }
+}
 
-    // プリセットをセレクトボックスに追加
-    presets.forEach(function (preset) {
-        var option = document.createElement("option");
-        option.value = preset.label;
-        option.text = preset.label;
-        select.add(option);
+function add() {
+    var presetList = document.getElementById("presetList");
+    presetList.innerHTML = "";
+
+    presets.forEach(preset => {
+        var column = createPresetElement(preset);
+        presetList.appendChild(column);
     });
 }
 
-// プリセットをストレージに保存する関数
-function savePresetsToStorage() {
-    // プリセット情報を文字列に変換
-    var presetsString = JSON.stringify(presets);
+function createPresetElement(preset) {
+    var column = document.createElement("div");
+    column.className = "column";
+    column.textContent = preset.label;
+    column.addEventListener("click", function () {
+        openForm(preset.entry);
+    });
 
+    return column;
+}
+
+function save() {
+    var presetsString = JSON.stringify(presets.map(preset => ({ label: preset.label, entry: preset.entry })));
     chrome.storage.sync.set({ presets: presetsString }, function () {
         console.log("プリセットが保存されました。");
-
-        // 保存が完了したらセレクトボックスに新しいプリセットを追加
-        addPresetsToSelect();
+        add();
     });
 }
 
-// プリセット選択ボタンがクリックされたときの処理
-document.getElementById("openButton").addEventListener("click", function () {
-    var select = document.getElementById("pref");
-    var selectedPref = select.options[select.selectedIndex].value;
-
-    // プリセットごとの条件分岐
-    var selectedPreset = presets.find(function (preset) {
-        return preset.label === selectedPref;
-    });
-
-    if (selectedPreset) {
-        window.open(selectedPreset.url);
-    }
-});
-
-// 拡張機能が読み込まれた時にストレージからプリセットを取得
 chrome.storage.sync.get(['presets'], function (result) {
     if (result.presets) {
-        // プリセット情報を配列に変換
         presets = JSON.parse(result.presets);
-        addPresetsToSelect();
+        add();
     }
 });
+
+function createPresetURL(entry, confirmationStatus = true) {
+    const entries = [
+        { id: "414286780", value: confirmationStatus ? "%E7%A2%BA%E8%AA%8D%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F" : "" },
+        { id: "2123243110", value: encodeURIComponent(entry) },
+        { id: "1948296131", value: confirmationStatus ? "%E7%A2%BA%E8%AA%8D%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F" : "" }
+    ];
+
+    const queryString = entries.map(entry => `entry.${entry.id}=${entry.value}`).join('&');
+    return `https://docs.google.com/forms/d/e/1FAIpQLSeU0te7mtB5xNZOEJTuUZ0ugfVx5yMWN6bptes_LLa42oHFQA/viewform?${queryString}`;
+}
+function showConfirmationModal(title, message, callback, confirmButtonText, cancelButtonText) {
+    var confirmationModal = document.getElementById("confirmationModal");
+    var modalContent = document.querySelector("#confirmationModal .modal-content");
+    document.getElementById("cancelDelete").removeEventListener("click", cancelClickHandler);
+    document.getElementById("confirmDelete").removeEventListener("click", confirmClickHandler);
+
+    var titleHTML = `<h2>${title}</h2>`;
+    var messageHTML = typeof message === 'function' ? `<p>${message()}</p>` : `<p>${message.replace(/\n/g, "<br>")}</p>`;
+    var confirmButtonHTML = `<button id="confirmDelete">${confirmButtonText}</button>`;
+    var cancelButtonHTML = `<button id="cancelDelete">${cancelButtonText}</button>`;
+
+    modalContent.innerHTML = titleHTML + messageHTML + confirmButtonHTML + cancelButtonHTML;
+
+    confirmationModal.style.display = "block";
+    document.getElementById("confirmDelete").addEventListener("click", confirmClickHandler);
+    document.getElementById("cancelDelete").addEventListener("click", cancelClickHandler);
+
+    function confirmClickHandler() {
+        confirmationModal.style.display = "none";
+        callback(true);
+    }
+
+    function cancelClickHandler() {
+        confirmationModal.style.display = "none";
+        callback(false);
+    }
+}
